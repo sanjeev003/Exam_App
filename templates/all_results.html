@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Results</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: #2c3e50;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+        .results-container {
+            max-width: 1000px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+            vertical-align: top;
+        }
+        table th {
+            background: #3498db;
+            color: #fff;
+        }
+        table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        table tr:hover {
+            background: #f1f1f1;
+        }
+        .btn {
+            padding: 8px 15px;
+            background: #27ae60;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background: #219150;
+        }
+        .danger {
+            background: #e74c3c;
+        }
+        .danger:hover {
+            background: #c0392b;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 25px;
+            padding: 10px 15px;
+            background: #3498db;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+        .back-link:hover {
+            background: #2980b9;
+        }
+        /* Collapsible styles */
+        .collapsible {
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #3498db;
+        }
+        .responses-content {
+            display: none;
+            text-align: left;
+            margin-top: 10px;
+        }
+    </style>
+    <script>
+        function toggleResponses(id) {
+            const content = document.getElementById("responses-" + id);
+            const icon = document.getElementById("icon-" + id);
+            if (content.style.display === "none" || content.style.display === "") {
+                content.style.display = "block";
+                icon.textContent = "➖"; // collapse icon
+            } else {
+                content.style.display = "none";
+                icon.textContent = "➕"; // expand icon
+            }
+        }
+
+
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Admin Panel</h1>
+    </header>
+
+    <div class="results-container">
+        <h2>Exam Results</h2>
+
+        <table>
+            <tr>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Score</th>
+                <th>Submitted At</th>
+                <th>Responses</th>
+                <th>Actions</th>
+            </tr>
+            {% for r in results %}
+            <tr>
+                <td>{{ r['roll_no'] }}</td>
+                <td>{{ r['name'] }}</td>
+                <td>{{ r['score'] }}</td>
+                <td>{{ r['submitted_at'] }}</td>
+                <td>
+                    {% if r['responses_parsed'] %}
+                        <button class="collapsible" onclick="toggleResponses('{{ r['roll_no'] }}')">
+                            <span id="icon-{{ r['roll_no'] }}">➕</span>
+                        </button>
+                        <div id="responses-{{ r['roll_no'] }}" class="responses-content">
+                            {% for ans in r['responses_parsed'] %}
+                                <p>
+                                    <strong>Q:</strong> {{ ans['text'] }}<br>
+                                    <strong>Chosen:</strong> {{ ans['chosen'] }}<br>
+                                    <strong>Correct:</strong> {{ ans['correct'] }}<br>
+                                    <strong>Status:</strong> {{ '✔ Correct' if ans['is_correct'] else '✘ Wrong' }}
+                                </p>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        No responses
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if r['score'] != '-' %}
+                        <form action="/admin/remove_result/{{ r['roll_no'] }}" method="post" style="display:inline;">
+                            <button type="submit" class="btn danger">Remove Result</button>
+                        </form>
+                        <a href="/admin/export_student/{{ r['roll_no'] }}" class="btn" style="margin-left:5px;">Export Student</a>
+                    {% else %}
+                        <span style="color:#27ae60; font-weight:bold;">Eligible for Re‑Exam</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <a href="/admin/dashboard" class="back-link">Back to Dashboard</a>
+        <a href="/admin/export" class="back-link" style="margin-left:10px;">Export Basic Results</a>
+        <a href="/admin/export_with_responses" class="back-link" style="margin-left:10px;">Export Results with Responses</a>
+    </div>
+</body>
+</html>

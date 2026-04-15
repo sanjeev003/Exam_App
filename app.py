@@ -1,0 +1,507 @@
+from flask import Flask, render_template, request, redirect, url_for, session, Response
+import sqlite3
+import csv
+from datetime import datetime
+import pytz
+import os
+import psycopg2
+import psycopg2.extras
+
+
+app = Flask(__name__)
+app.secret_key = "your_secret_key_here"  # Needed for sessions
+
+def get_db_connection():
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],   # Render sets this automatically
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    return conn
+
+
+# ---------------- STUDENT ROUTES ----------------
+
+@app.route('/')
+def login():
+    return render_template('login.html')
+from flask import session, redirect, url_for
+
+@app.route('/logout')
+def logout():
+    # Clear the session so the admin is logged out
+    session.clear()
+    # Redirect back to the admin login page
+    return redirect(url_for('admin_login'))
+
+# Exam page (GET + POST)
+@app.route('/exam', methods=['GET', 'POST'])
+def exam():
+    if request.method == 'POST':
+        roll_no = request.form['roll_no']
+        session['student_roll'] = roll_no
+    else:
+        roll_no = session.get('student_roll')
+
+    if not roll_no:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    student = conn.execute("SELECT * FROM students WHERE roll_no=?", (roll_no,)).fetchone()
+
+    if not student:
+        conn.close()
+        return render_template("invalid_roll.html")
+
+
+    # Check if already submitted
+    existing = conn.execute("SELECT * FROM results WHERE student_roll=? AND score IS NOT NULL", (roll_no,)).fetchone()
+    if existing:
+        conn.close()
+        return render_template("already_submitted.html")
+
+
+    ist = pytz.timezone('Asia/Kolkata')
+    existing_result = conn.execute("SELECT start_time, question_ids FROM results WHERE student_roll=?", (roll_no,)).fetchone()
+
+    if not existing_result or existing_result['start_time'] is None:
+        start_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+        # Pick 30 random questions
+        questions = conn.execute("SELECT id FROM questions ORDER BY RANDOM() LIMIT 30").fetchall()
+        question_ids = ",".join(str(q['id']) for q in questions)
+        conn.execute("INSERT OR REPLACE INTO results (student_roll, start_time, question_ids) VALUES (?, ?, ?)",
+                     (roll_no, start_time, question_ids))
+        conn.commit()
+        # Reload full question data
+        questions = conn.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})").fetchall()
+    else:
+        start_time = existing_result['start_time']
+        question_ids = existing_result['question_ids']
+        questions = conn.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})").fetchall()
+
+    conn.close()
+    return render_template('exam.html', student=student, questions=questions, start_time=start_time)
+
+# # Submission route with time enforcement
+# @app.route('/submit', methods=['POST'])
+# def submit():
+#     roll_no = session.get('student_roll')
+#     if not roll_no:
+#         return "Session expired or invalid access."
+
+#     conn = get_db_connection()
+#     session_data = conn.execute("SELECT start_time, question_ids FROM results WHERE student_roll=?", (roll_no,)).fetchone()
+
+#     if not session_data or not session_data['start_time']:
+#         conn.close()
+#         return "Exam session invalid."
+
+#     ist = pytz.timezone('Asia/Kolkata')
+#     start_time = ist.localize(datetime.strptime(session_data['start_time'], "%Y-%m-%d %H:%M:%S"))
+#     now = datetime.now(ist)
+#     elapsed_minutes = (now - start_time).total_seconds() / 60
+
+#     if elapsed_minutes > 30:
+#         conn.close()
+#         session.pop('student_roll', None)
+#         return "Time is up! Your exam session expired."
+
+#     # Grade only the assigned questions
+#     question_ids = session_data['question_ids']
+#     questions = conn.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})").fetchall()
+#     score = 0
+#     for q in questions:
+#         user_answer = request.form.get(str(q['id']))
+#         print(f"Question ID: {q['id']}, User answer: {user_answer}, Correct answer: {q['correct_option']}")
+#         if user_answer == q['correct_option']:
+#             score += 1
+
+#     conn.execute("UPDATE results SET score=?, submitted_at=? WHERE student_roll=?",
+#                  (score, now.strftime("%Y-%m-%d %H:%M:%S"), roll_no))
+#     conn.commit()
+#     conn.close()
+
+#     session.pop('student_roll', None)
+#     return render_template('result.html', score=score)
+
+# Submission route with time enforcement
+@app.route('/submit', methods=['POST'])
+def submit():
+    roll_no = session.get('student_roll')
+    if not roll_no:
+        return "Session expired or invalid access."
+
+    conn = get_db_connection()
+    session_data = conn.execute(
+        "SELECT start_time, question_ids FROM results WHERE student_roll=?",
+        (roll_no,)
+    ).fetchone()
+
+    if not session_data or not session_data['start_time']:
+        conn.close()
+        return "Exam session invalid."
+
+    ist = pytz.timezone('Asia/Kolkata')
+    start_time = ist.localize(datetime.strptime(session_data['start_time'], "%Y-%m-%d %H:%M:%S"))
+    now = datetime.now(ist)
+    elapsed_minutes = (now - start_time).total_seconds() / 60
+
+    if elapsed_minutes > 30:
+        conn.close()
+        session.pop('student_roll', None)
+        return "Time is up! Your exam session expired."
+
+    # Grade only the assigned questions
+    question_ids = session_data['question_ids']
+    questions = conn.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})").fetchall()
+    score = 0
+    feedback = []
+
+    for q in questions:
+        user_answer = request.form.get(str(q['id']))
+        print(f"Question ID: {q['id']}, User answer: {user_answer}, Correct answer key: {q['correct_option']}")
+
+        # Explicitly map option keys to their actual text values
+        options_map = {
+            "option_a": q["option_a"],
+            "option_b": q["option_b"],
+            "option_c": q["option_c"],
+            "option_d": q["option_d"],
+        }
+
+        correct_key = q['correct_option']
+        correct_text = options_map.get(correct_key, "⚠ Invalid DB value")
+        chosen_text = options_map.get(user_answer, "Not answered")
+
+        feedback.append({
+            "text": q['text'],
+            "chosen": chosen_text,
+            "correct": correct_text,
+            "is_correct": (user_answer == correct_key)
+        })
+
+        if user_answer == correct_key:
+            score += 1
+
+    # 🔹 NEW: Save responses JSON into results table
+    import json
+    conn.execute(
+        "UPDATE results SET score=?, submitted_at=?, responses=? WHERE student_roll=?",
+        (score, now.strftime("%Y-%m-%d %H:%M:%S"), json.dumps(feedback), roll_no)
+    )
+    
+    conn.commit()
+    conn.close()
+
+    session.pop('student_roll', None)
+    return render_template('result.html', score=score, feedback=feedback)
+
+
+
+# ---------------- ADMIN ROUTES ----------------
+
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin123"
+
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return "Invalid credentials!"
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin_login'))
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+    return render_template('admin_dashboard.html')
+
+import json
+
+@app.route('/admin/results')
+def view_results():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    conn = get_db_connection()
+    results = conn.execute("""
+        SELECT s.roll_no, s.name,
+               COALESCE(r.score, '-') AS score,
+               COALESCE(r.submitted_at, '-') AS submitted_at,
+               COALESCE(r.start_time, '-') AS start_time,
+               r.responses
+        FROM students s
+        LEFT JOIN (
+            SELECT student_roll, score, MAX(submitted_at) AS submitted_at,
+                   MIN(start_time) AS start_time, MAX(responses) AS responses
+            FROM results
+            GROUP BY student_roll
+        ) r ON s.roll_no = r.student_roll
+        ORDER BY s.roll_no
+    """).fetchall()
+    conn.close()
+
+    # Decode JSON responses into Python objects
+    processed_results = []
+    for r in results:
+        responses = []
+        if r['responses']:
+            try:
+                responses = json.loads(r['responses'])
+            except Exception:
+                responses = []
+        processed_results.append({**r, "responses_parsed": responses})
+
+    return render_template('all_results.html', results=processed_results)
+
+
+
+@app.route('/admin/export')
+def export_results():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    conn = get_db_connection()
+    results = conn.execute("""
+        SELECT s.roll_no, s.name,
+               COALESCE(r.score, '-') AS score,
+               COALESCE(r.submitted_at, '-') AS submitted_at,
+               COALESCE(r.start_time, '-') AS start_time
+        FROM students s
+        LEFT JOIN (
+            SELECT student_roll, score, MAX(submitted_at) AS submitted_at, MIN(start_time) AS start_time
+            FROM results
+            GROUP BY student_roll
+        ) r ON s.roll_no = r.student_roll
+        ORDER BY s.roll_no
+    """).fetchall()
+    conn.close()
+
+    output = Response(content_type="text/csv")
+    writer = csv.writer(output.stream)
+    writer.writerow(["Roll No", "Name", "Score", "Submitted At", "Start Time"])
+    for r in results:
+        writer.writerow([r['roll_no'], r['name'], r['score'], r['submitted_at'], r['start_time']])
+    output.headers["Content-Disposition"] = "attachment; filename=results.csv"
+    return output
+
+@app.route('/admin/clear_scores')
+def clear_scores():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    conn = get_db_connection()
+    conn.execute("UPDATE results SET score = NULL, submitted_at = NULL, start_time = NULL")
+    conn.commit()
+    conn.close()
+    return "All scores and submission times cleared successfully!"
+
+@app.route('/admin/remove_result/<roll_no>', methods=['POST'])
+def remove_result(roll_no):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    conn = get_db_connection()
+    conn.execute("DELETE FROM results WHERE student_roll=?", (roll_no,))
+    conn.commit()
+    conn.close()
+    return f"Result for Roll No {roll_no} removed. Student can re‑attempt exam."
+
+import csv, json
+from flask import Response
+
+@app.route('/admin/export_with_responses')
+def export_with_responses():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    conn = get_db_connection()
+    results = conn.execute("""
+        SELECT s.roll_no, s.name,
+               COALESCE(r.score, '-') AS score,
+               COALESCE(r.submitted_at, '-') AS submitted_at,
+               COALESCE(r.start_time, '-') AS start_time,
+               r.responses
+        FROM students s
+        LEFT JOIN (
+            SELECT student_roll, score, MAX(submitted_at) AS submitted_at,
+                   MIN(start_time) AS start_time, MAX(responses) AS responses
+            FROM results
+            GROUP BY student_roll
+        ) r ON s.roll_no = r.student_roll
+        ORDER BY s.roll_no
+    """).fetchall()
+    conn.close()
+
+    output = Response(content_type="text/csv")
+    writer = csv.writer(output.stream)
+    writer.writerow(["Roll No", "Name", "Score", "Submitted At", "Start Time", "Question", "Chosen", "Correct", "Is Correct"])
+
+    for r in results:
+        responses = json.loads(r['responses']) if r['responses'] else []
+        for ans in responses:
+            writer.writerow([
+                r['roll_no'],
+                r['name'],
+                r['score'],
+                r['submitted_at'],
+                r['start_time'],
+                ans['text'],
+                ans['chosen'],
+                ans['correct'],
+                "Correct" if ans['is_correct'] else "Wrong"
+            ])
+
+    output.headers["Content-Disposition"] = "attachment; filename=results_with_responses.csv"
+    return output
+
+@app.route('/admin/export_student/<roll_no>')
+def export_student(roll_no):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    conn = get_db_connection()
+    r = conn.execute("""
+        SELECT s.roll_no, s.name,
+               COALESCE(r.score, '-') AS score,
+               COALESCE(r.submitted_at, '-') AS submitted_at,
+               COALESCE(r.start_time, '-') AS start_time,
+               r.responses
+        FROM students s
+        LEFT JOIN (
+            SELECT student_roll, score, MAX(submitted_at) AS submitted_at,
+                   MIN(start_time) AS start_time, MAX(responses) AS responses
+            FROM results
+            GROUP BY student_roll
+        ) r ON s.roll_no = r.student_roll
+        WHERE s.roll_no = ?
+    """, (roll_no,)).fetchone()
+    conn.close()
+
+    output = Response(content_type="text/csv")
+    writer = csv.writer(output.stream)
+    writer.writerow(["Roll No", "Name", "Score", "Submitted At", "Start Time", "Question", "Chosen", "Correct", "Is Correct"])
+
+    responses = json.loads(r['responses']) if r['responses'] else []
+    for ans in responses:
+        writer.writerow([
+            r['roll_no'],
+            r['name'],
+            r['score'],
+            r['submitted_at'],
+            r['start_time'],
+            ans['text'],
+            ans['chosen'],
+            ans['correct'],
+            "Correct" if ans['is_correct'] else "Wrong"
+        ])
+
+    output.headers["Content-Disposition"] = f"attachment; filename={roll_no}_responses.csv"
+    return output
+
+
+@app.route('/admin/students')
+def manage_students():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+    conn = get_db_connection()
+    students = conn.execute("SELECT * FROM students ORDER BY roll_no").fetchall()
+    conn.close()
+    return render_template('students.html', students=students)
+
+@app.route('/admin/add_student', methods=['POST'])
+def add_student():
+    roll_no = request.form['roll_no']
+    name = request.form['name']
+    conn = get_db_connection()
+    conn.execute("INSERT INTO students (roll_no, name) VALUES (?, ?)", (roll_no, name))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('manage_students'))
+
+@app.route('/admin/update_student/<roll_no>', methods=['POST'])
+def update_student(roll_no):
+    new_name = request.form['new_name']
+    conn = get_db_connection()
+    conn.execute("UPDATE students SET name=? WHERE roll_no=?", (new_name, roll_no))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('manage_students'))
+
+@app.route('/admin/remove_student/<roll_no>', methods=['POST'])
+def remove_student(roll_no):
+    conn = get_db_connection()
+    conn.execute("DELETE FROM students WHERE roll_no=?", (roll_no,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('manage_students'))
+
+@app.route('/admin/questions')
+def manage_questions():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+    conn = get_db_connection()
+    questions = conn.execute("SELECT * FROM questions ORDER BY id").fetchall()
+    conn.close()
+    return render_template('questions.html', questions=questions)
+
+@app.route('/admin/add_question', methods=['POST'])
+def add_question():
+    text = request.form['text']
+    option_a = request.form['option_a']
+    option_b = request.form['option_b']
+    option_c = request.form['option_c']
+    option_d = request.form['option_d']
+    correct_option = request.form['correct_option'].strip()
+
+    # 🔹 Normalize input: handle both lowercase and uppercase
+    mapping = {
+        "a": "option_a", "A": "option_a",
+        "b": "option_b", "B": "option_b",
+        "c": "option_c", "C": "option_c",
+        "d": "option_d", "D": "option_d"
+    }
+    correct_option = mapping.get(correct_option, correct_option)
+
+    conn = get_db_connection()
+    conn.execute(
+        "INSERT INTO questions (text, option_a, option_b, option_c, option_d, correct_option) VALUES (?, ?, ?, ?, ?, ?)",
+        (text, option_a, option_b, option_c, option_d, correct_option)
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for('manage_questions'))
+
+
+@app.route('/admin/update_question/<int:id>', methods=['POST'])
+def update_question(id):
+    new_text = request.form['new_text']
+    conn = get_db_connection()
+    conn.execute("UPDATE questions SET text=? WHERE id=?", (new_text, id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('manage_questions'))
+
+@app.route('/admin/remove_question/<int:id>', methods=['POST'])
+def remove_question(id):
+    conn = get_db_connection()
+    conn.execute("DELETE FROM questions WHERE id=?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('manage_questions'))
+
+
+# ---------------- MAIN ----------------    
+
+if __name__ == '__main__':
+    app.run(debug=True)

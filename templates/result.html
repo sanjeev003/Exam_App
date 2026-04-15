@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exam Result</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            margin: 0;
+            padding: 0;
+        }
+        .home-icon {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 26px;
+            text-decoration: none;
+            color: #fff;
+        }
+        .home-icon:hover { color: #f1c40f; }
+        .result-container {
+            max-width: 600px;
+            margin: 100px auto 40px auto;
+            background: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+        }
+        h2 { margin-bottom: 25px; color: #2c3e50; }
+        .score {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #3498db;
+        }
+        .summary { font-size: 18px; margin-bottom: 20px; color: #555; }
+        .feedback-section {
+            text-align: left;
+            margin-top: 30px;
+        }
+        .question {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .correct { color: #27ae60; font-weight: bold; }
+        .wrong { color: #e74c3c; font-weight: bold; }
+        button {
+            padding: 12px 25px;
+            background: #3498db;
+            color: #fff;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover { background: #2980b9; }
+        /* Footer storytelling section */
+        .footer {
+            margin: 40px auto;
+            max-width: 900px;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            font-size: 14px;
+            color: #555;
+        }
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 30px;
+        }
+        .footer-left { flex: 2; }
+        .footer-left h3 { margin-bottom: 10px; color: #2c3e50; }
+        .footer-left p { margin-bottom: 10px; }
+        .feedback { margin-top: 15px; font-style: italic; color: #3498db; }
+        .footer-right { flex: 1; text-align: center; }
+        .dev-photo {
+            width: 250px; height: 250px; border-radius: 50%;
+            object-fit: cover; object-position: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .dev-name {
+            margin-top: 10px; font-size: 18px; color: #2c3e50;
+            font-weight: bold; margin-bottom: 15px;
+        }
+        .dev-caption { font-size: 14px; color: #777; font-style: italic; }
+        @media (max-width: 768px) {
+            .footer-content { flex-direction: column; align-items: center; text-align: center; }
+            .footer-left, .footer-right { flex: unset; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Home icon -->
+    <a href="/" class="home-icon">🏠</a>
+
+    <!-- Result card -->
+    <div class="result-container">
+        <h2>Exam Completed</h2>
+        <div class="score">You scored {{ score }} out of 30</div>
+        <div class="summary">Great job! Keep learning and all the best for your future!</div>
+
+        <!-- Detailed feedback -->
+        <div class="feedback-section">
+            <h3>Your Answers:</h3>
+            {% for q in feedback %}
+            <div class="question">
+                <p><strong>Q:</strong> {{ q.text }}</p>
+                {% if q.is_correct %}
+                    <p class="correct">✔ Correct (Your answer: {{ q.chosen }})</p>
+                {% else %}
+                    <p class="wrong">✘ Wrong (Your answer: {{ q.chosen if q.chosen else "Not answered" }})</p>
+                    <p>Correct answer: {{ q.correct }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Storytelling + Photo Section -->
+    <div class="footer">
+        <div class="footer-content">
+            <div class="footer-left">
+                <h3>Why This Platform Exists</h3>
+                <p>
+                    It all started here at <strong>NIT Uttarakhand</strong>, during our lab exams.  
+                    We saw piles of answer sheets, stacks of paper wasted, and teachers spending long hours correcting them.  
+                    The process felt heavy — on the environment, on time, and on effort.
+                </p>
+                <p>
+                    That’s when the idea struck: <em>why not bring our exams online?</em>  
+                    A platform that saves paper, reduces correction time, and makes the whole process smoother for both students and teachers.  
+                    This is not just code — it’s a step toward sustainability and efficiency.
+                </p>
+                <p class="feedback">
+                    Dear students, this is the very first draft of my idea.  
+                    Your experience matters — please share your thoughts, stories, and suggestions.  
+                    Together, we can make this platform better, smarter, and truly ours.
+                </p>
+            </div>
+            <div class="footer-right">
+                <img src="{{ url_for('static', filename='images/my.jpg') }}" alt="Developer Photo" class="dev-photo">
+                <p class="dev-name"><strong>- SANJEEV KUMAR</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Return to Login Button -->
+    <div style="text-align:center; margin:30px;">
+        <button onclick="window.location.href='/'">Return to Login</button>
+    </div>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: #2c3e50;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+        .dashboard-container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .btn {
+            flex: 1 1 200px;
+            padding: 15px;
+            background: #27ae60;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        .btn:hover {
+            background: #219150;
+        }
+        .danger {
+            background: #e74c3c;
+        }
+        .danger:hover {
+            background: #c0392b;
+        }
+        .form-section {
+            margin-top: 40px;
+            text-align: center;
+        }
+        .form-section h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        input[type="text"] {
+            padding: 12px;
+            width: 250px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 12px 20px;
+            background: #27ae60;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #219150;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Admin Dashboard</h1>
+    </header>
+
+    <div class="dashboard-container">
+        <h2>Welcome, Admin</h2>
+
+        <div class="btn-group">
+            <a href="/admin/results" class="btn">View Results</a>
+            <a href="/admin/reset" class="btn danger">Reset Scores & Times</a>
+            <a href="/admin/export" class="btn">Export Scores as CSV</a>
+            <a href="/admin/students" class="btn">Manage Students</a>
+            <a href="/admin/questions" class="btn">Manage Questions</a>
+
+            <a href="/logout" class="btn">Logout</a>
+        </div>
+
+        <div class="form-section">
+            <h3>Remove a Student’s Result (Allow Re‑Exam)</h3>
+            <form method="POST" action="/admin/remove">
+                <input type="text" name="roll_no" placeholder="Enter Roll No" required>
+                <button type="submit">Remove Result</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

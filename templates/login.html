@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Login</title>
+    <style>
+    body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: linear-gradient(135deg, #2c3e50, #3498db); /* same blend as admin */
+        margin: 0;
+        padding: 0;
+    }
+    .home-icon {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 26px;
+        text-decoration: none;
+        color: #fff;
+    }
+    .home-icon:hover {
+        color: #f1c40f;
+    }
+    .login-container {
+        max-width: 400px;
+        margin: 100px auto;
+        background: #fff;
+        padding: 40px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+    }
+    h2 {
+        margin-bottom: 25px;
+        color: #2c3e50;
+    }
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+        color: #555;
+        text-align: left;
+    }
+    input[type="text"] {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 20px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 16px;
+    }
+    button {
+        width: 100%;
+        padding: 12px;
+        background: #3498db;
+        color: #fff;
+        font-size: 18px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    button:hover {
+        background: #2980b9;
+    }
+    .admin-link {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 15px;
+        background-color: #007BFF;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+    .admin-link:hover {
+        background-color: #0056b3;
+    }
+    /* Footer redesigned as two-column flexbox */
+    .footer {
+        margin: 40px auto;
+        max-width: 900px;
+        background: #fff;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        font-size: 14px;
+        color: #555;
+    }
+    .footer-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 30px;
+    }
+    .footer-left {
+        flex: 2;
+    }
+    .footer-left h3 {
+        margin-bottom: 10px;
+        color: #2c3e50;
+    }
+    .footer-left p {
+        margin-bottom: 10px;
+    }
+    .feedback {
+        margin-top: 15px;
+        font-style: italic;
+        color: #3498db;
+    }
+    .footer-right {
+        flex: 1;
+        text-align: center;
+    }
+    .dev-photo {
+        width: 250px;
+        height: 250px;
+        border-radius: 50%;
+        object-fit: cover;
+        object-position: center;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .dev-name {
+        margin-top: 10px;
+        font-size: 18px;
+        color: #2c3e50;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+    /* Responsive: stack columns on small screens */
+    @media (max-width: 768px) {
+        .footer-content {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .footer-left, .footer-right {
+            flex: unset;
+            width: 100%;
+        }
+    }
+</style>
+
+</head>
+<body>
+
+    <div class="login-container">
+        <h2>Student Login</h2>
+        <form method="POST" action="/exam">
+            <label for="roll_no">Enter Roll Number:</label>
+            <input type="text" id="roll_no" name="roll_no" required>
+            <button type="submit">Login</button>
+        </form>
+        <a href="/admin/login" class="admin-link">Admin Login</a>
+    </div>
+
+    <div class="footer">
+    <div class="footer-content">
+        <!-- Left side: Story -->
+        <div class="footer-left">
+            <h3>Why This Platform Exists</h3>
+            <p>
+                It all started here at <strong>NIT Uttarakhand</strong>, during our lab exams.  
+                We saw piles of answer sheets, stacks of paper wasted, and teachers spending long hours correcting them.  
+                The process felt heavy — on the environment, on time, and on effort.
+            </p>
+            <p>
+                That’s when the idea struck: <em>why not bring our exams online?</em>  
+                A platform that saves paper, reduces correction time, and makes the whole process smoother for both students and teachers.  
+                This is not just code — it’s a step toward sustainability and efficiency.
+            </p>
+            <p class="feedback">
+                Dear students, this is the very first draft of my idea.  
+                Your experience matters — please share your thoughts, stories, and suggestions.  
+                Together, we can make this platform better, smarter, and truly ours.
+            </p>
+        </div>
+
+        <!-- Right side: Photo + Name -->
+        <div class="footer-right">
+            <img src="{{ url_for('static', filename='images/my.jpg') }}" alt="Developer Photo" class="dev-photo">
+
+            <p class="dev-name"><strong>- SANJEEV KUMAR</strong></p>
+        </div>
+    </div>
+</div>
+
+
+</body>
+</html>

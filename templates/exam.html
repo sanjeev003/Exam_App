@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exam Page</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f6f9;
+            color: #333;
+        }
+        header {
+            background: #2c3e50;
+            color: #fff;
+            padding: 15px;
+            text-align: center;
+        }
+        #timer {
+            font-size: 22px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 20px;
+            text-align: center;
+        }
+        .exam-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .question {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .question p {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #27ae60;
+            color: #fff;
+            font-size: 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #219150;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h2>Welcome, {{ student['name'] }} (Roll No: {{ student['roll_no'] }})</h2>
+    </header>
+
+    <div id="timer"></div>
+
+    <div class="exam-container">
+        <p>You have 30 minutes to complete 30 questions.</p>
+
+        <form id="examForm" method="POST" action="/submit">
+            {% for q in questions %}
+            <div class="question">
+                <p>Q{{ loop.index }}. {{ q['text'] }}</p>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_a"> {{ q['option_a'] }}</label>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_b"> {{ q['option_b'] }}</label>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_c"> {{ q['option_c'] }}</label>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_d"> {{ q['option_d'] }}</label>
+            </div>
+            {% endfor %}
+            <button type="submit">Submit Exam</button>
+        </form>
+    </div>
+
+    <script>
+    // Timer logic
+    const startTime = new Date("{{ start_time }}").getTime();
+    const duration = 30 * 60 * 1000; // 30 minutes
+    const endTime = startTime + duration;
+
+    function updateTimer() {
+        const now = new Date().getTime();
+        const remaining = endTime - now;
+
+        if (remaining <= 0) {
+            document.getElementById("timer").innerHTML = "Time is up!";
+            document.getElementById("examForm").submit();
+        } else {
+            const minutes = Math.floor((remaining / 1000 / 60));
+            const seconds = Math.floor((remaining / 1000) % 60);
+            document.getElementById("timer").innerHTML = minutes + "m " + seconds + "s remaining";
+        }
+    }
+    setInterval(updateTimer, 1000);
+
+    // 🔹 Browser Lock Features
+
+    // Warn if the student tries to close or refresh
+    window.onbeforeunload = function() {
+        return "You cannot leave the exam before submitting!";
+    };
+
+    // Disable warning when submitting
+    document.getElementById("examForm").addEventListener("submit", function() {
+        window.onbeforeunload = null;
+    });
+
+    // Detect tab switch or minimize
+    document.addEventListener("visibilitychange", function() {
+        if (document.hidden) {
+            alert("⚠ Tab switch detected! Please stay on the exam page.");
+        }
+    });
+
+    // Disable right-click
+    document.addEventListener("contextmenu", event => event.preventDefault());
+
+    // Force fullscreen only after a user gesture
+    function lockFullscreen() {
+        let elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.mozRequestFullScreen) { // Firefox
+            elem.mozRequestFullScreen();
+        } else if (elem.webkitRequestFullscreen) { // Chrome, Safari
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) { // IE/Edge
+            elem.msRequestFullscreen();
+        }
+    }
+
+    // Add a button to trigger fullscreen
+    document.addEventListener("DOMContentLoaded", function() {
+        const btn = document.createElement("button");
+        btn.textContent = "Start Exam (Enter Fullscreen)";
+        btn.style = "padding:10px 20px; background:#3498db; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:16px;";
+        btn.onclick = function() {
+            lockFullscreen();
+            btn.style.display = "none"; // hide button after entering fullscreen
+        };
+        document.body.insertBefore(btn, document.body.firstChild);
+    });
+
+    // Try to re‑enter fullscreen if user exits
+    document.addEventListener("fullscreenchange", function() {
+        if (!document.fullscreenElement) {
+            alert("⚠ Fullscreen is required for the exam. Please re‑enter.");
+        }
+    });
+</script>
+
+</body>
+
+</html>
