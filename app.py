@@ -45,41 +45,60 @@ def exam():
     if not roll_no:
         return redirect(url_for('login'))
 
-    conn = get_db_connection()
-    student = conn.execute("SELECT * FROM students WHERE roll_no=?", (roll_no,)).fetchone()
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    # Get student record
+    cur.execute("SELECT * FROM students WHERE roll_no = %s", (roll_no,))
+    student = cur.fetchone()
 
     if not student:
+        cur.close()
         conn.close()
         return render_template("invalid_roll.html")
 
-
     # Check if already submitted
-    existing = conn.execute("SELECT * FROM results WHERE student_roll=? AND score IS NOT NULL", (roll_no,)).fetchone()
+    cur.execute("SELECT * FROM results WHERE roll_no = %s AND score IS NOT NULL", (roll_no,))
+    existing = cur.fetchone()
     if existing:
+        cur.close()
         conn.close()
         return render_template("already_submitted.html")
 
-
     ist = pytz.timezone('Asia/Kolkata')
-    existing_result = conn.execute("SELECT start_time, question_ids FROM results WHERE student_roll=?", (roll_no,)).fetchone()
+    cur.execute("SELECT start_time, question_ids FROM results WHERE roll_no = %s", (roll_no,))
+    existing_result = cur.fetchone()
 
     if not existing_result or existing_result['start_time'] is None:
         start_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
         # Pick 30 random questions
-        questions = conn.execute("SELECT id FROM questions ORDER BY RANDOM() LIMIT 30").fetchall()
+        cur.execute("SELECT id FROM questions ORDER BY RANDOM() LIMIT 30")
+        questions = cur.fetchall()
         question_ids = ",".join(str(q['id']) for q in questions)
-        conn.execute("INSERT OR REPLACE INTO results (student_roll, start_time, question_ids) VALUES (?, ?, ?)",
-                     (roll_no, start_time, question_ids))
+
+        cur.execute(
+            "INSERT INTO results (roll_no, start_time, question_ids) VALUES (%s, %s, %s) "
+            "ON CONFLICT (roll_no) DO UPDATE SET start_time = EXCLUDED.start_time, question_ids = EXCLUDED.question_ids",
+            (roll_no, start_time, question_ids)
+        )
         conn.commit()
+
         # Reload full question data
-        questions = conn.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})").fetchall()
+        cur.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})")
+        questions = cur.fetchall()
     else:
         start_time = existing_result['start_time']
         question_ids = existing_result['question_ids']
-        questions = conn.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})").fetchall()
+        cur.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})")
+        questions = cur.fetchall()
 
+    cur.close()
     conn.close()
     return render_template('exam.html', student=student, questions=questions, start_time=start_time)
+
 
 # @app.route("/initdb")
 # def initdb():
@@ -240,22 +259,30 @@ def view_results():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
 
-    conn = get_db_connection()
-    results = conn.execute("""
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    cur.execute("""
         SELECT s.roll_no, s.name,
-               COALESCE(r.score, '-') AS score,
-               COALESCE(r.submitted_at, '-') AS submitted_at,
-               COALESCE(r.start_time, '-') AS start_time,
+               COALESCE(r.score::text, '-') AS score,
+               COALESCE(r.submitted_at::text, '-') AS submitted_at,
+               COALESCE(r.start_time::text, '-') AS start_time,
                r.responses
         FROM students s
         LEFT JOIN (
-            SELECT student_roll, score, MAX(submitted_at) AS submitted_at,
+            SELECT roll_no, score, MAX(submitted_at) AS submitted_at,
                    MIN(start_time) AS start_time, MAX(responses) AS responses
             FROM results
-            GROUP BY student_roll
-        ) r ON s.roll_no = r.student_roll
+            GROUP BY roll_no
+        ) r ON s.roll_no = r.roll_no
         ORDER BY s.roll_no
-    """).fetchall()
+    """)
+    results = cur.fetchall()
+
+    cur.close()
     conn.close()
 
     # Decode JSON responses into Python objects
@@ -421,10 +448,21 @@ def export_student(roll_no):
 def manage_students():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
-    conn = get_db_connection()
-    students = conn.execute("SELECT * FROM students ORDER BY roll_no").fetchall()
+
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM students ORDER BY roll_no")
+    students = cur.fetchall()
+
+    cur.close()
     conn.close()
+
     return render_template('students.html', students=students)
+
 
 @app.route('/admin/add_student', methods=['POST'])
 def add_student():
