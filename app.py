@@ -81,11 +81,11 @@ def exam():
     conn.close()
     return render_template('exam.html', student=student, questions=questions, start_time=start_time)
 
-@app.route("/initdb")
-def initdb():
-    from init_db import create_tables
-    create_tables()
-    return "Tables created successfully!"
+# @app.route("/initdb")
+# def initdb():
+#     from init_db import create_tables
+#     create_tables()
+#     return "Tables created successfully!"
 
 
 # # Submission route with time enforcement
