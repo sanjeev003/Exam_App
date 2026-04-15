@@ -18,6 +18,11 @@ def get_db_connection():
     )
     return conn
 
+@app.route("/initdb")
+def initdb():
+    from init_db import init_db
+    init_db()
+    return "Tables created successfully!"
 
 # ---------------- STUDENT ROUTES ----------------
 

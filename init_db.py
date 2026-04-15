@@ -1,8 +1,9 @@
+# init_db.py
 import psycopg2
 import psycopg2.extras
 import os
 
-def init_db():
+def create_tables():
     conn = psycopg2.connect(
         os.environ["DATABASE_URL"],
         cursor_factory=psycopg2.extras.DictCursor
@@ -37,6 +38,3 @@ def init_db():
     cur.close()
     conn.close()
     print("Tables created successfully!")
-
-if __name__ == "__main__":
-    init_db()
