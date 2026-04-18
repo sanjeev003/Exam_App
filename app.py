@@ -265,18 +265,24 @@ def view_results():
     )
     cur = conn.cursor()
 
+    # ✅ Removed MAX(responses) aggregation
     cur.execute("""
         SELECT s.roll_no, s.name,
                COALESCE(r.score::text, '-') AS score,
                COALESCE(r.submitted_at::text, '-') AS submitted_at,
                COALESCE(r.start_time::text, '-') AS start_time,
-               r.responses
+               r.responses,
+               r.question_ids
         FROM students s
         LEFT JOIN (
-            SELECT roll_no, score, MAX(submitted_at) AS submitted_at,
-                   MIN(start_time) AS start_time, MAX(responses) AS responses
+            SELECT roll_no,
+                   score,
+                   MAX(submitted_at) AS submitted_at,
+                   MIN(start_time) AS start_time,
+                   responses,
+                   question_ids
             FROM results
-            GROUP BY roll_no
+            GROUP BY roll_no, score, responses, question_ids
         ) r ON s.roll_no = r.roll_no
         ORDER BY s.roll_no
     """)
