@@ -265,7 +265,7 @@ def view_results():
     )
     cur = conn.cursor()
 
-    # ✅ Removed MAX(responses) aggregation
+    # ✅ Use DISTINCT ON to get the latest result per student
     cur.execute("""
         SELECT s.roll_no, s.name,
                COALESCE(r.score::text, '-') AS score,
@@ -275,14 +275,9 @@ def view_results():
                r.question_ids
         FROM students s
         LEFT JOIN (
-            SELECT roll_no,
-                   score,
-                   MAX(submitted_at) AS submitted_at,
-                   MIN(start_time) AS start_time,
-                   responses,
-                   question_ids
+            SELECT DISTINCT ON (roll_no) roll_no, score, submitted_at, start_time, responses, question_ids
             FROM results
-            GROUP BY roll_no, score, responses, question_ids
+            ORDER BY roll_no, submitted_at DESC
         ) r ON s.roll_no = r.roll_no
         ORDER BY s.roll_no
     """)
@@ -305,26 +300,34 @@ def view_results():
     return render_template('all_results.html', results=processed_results)
 
 
-
 @app.route('/admin/export')
 def export_results():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
 
-    conn = get_db_connection()
-    results = conn.execute("""
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    # ✅ Use DISTINCT ON to get latest result per student
+    cur.execute("""
         SELECT s.roll_no, s.name,
-               COALESCE(r.score, '-') AS score,
-               COALESCE(r.submitted_at, '-') AS submitted_at,
-               COALESCE(r.start_time, '-') AS start_time
+               COALESCE(r.score::text, '-') AS score,
+               COALESCE(r.submitted_at::text, '-') AS submitted_at,
+               COALESCE(r.start_time::text, '-') AS start_time
         FROM students s
         LEFT JOIN (
-            SELECT student_roll, score, MAX(submitted_at) AS submitted_at, MIN(start_time) AS start_time
+            SELECT DISTINCT ON (roll_no) roll_no, score, submitted_at, start_time
             FROM results
-            GROUP BY student_roll
-        ) r ON s.roll_no = r.student_roll
+            ORDER BY roll_no, submitted_at DESC
+        ) r ON s.roll_no = r.roll_no
         ORDER BY s.roll_no
-    """).fetchall()
+    """)
+    results = cur.fetchall()
+
+    cur.close()
     conn.close()
 
     output = Response(content_type="text/csv")
@@ -335,52 +338,66 @@ def export_results():
     output.headers["Content-Disposition"] = "attachment; filename=results.csv"
     return output
 
+
 @app.route('/admin/clear_scores')
 def clear_scores():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
 
-    conn = get_db_connection()
-    conn.execute("UPDATE results SET score = NULL, submitted_at = NULL, start_time = NULL")
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute("UPDATE results SET score = NULL, submitted_at = NULL, start_time = NULL")
     conn.commit()
+    cur.close()
     conn.close()
+
     return "All scores and submission times cleared successfully!"
+
 
 @app.route('/admin/remove_result/<roll_no>', methods=['POST'])
 def remove_result(roll_no):
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
 
-    conn = get_db_connection()
-    conn.execute("DELETE FROM results WHERE student_roll=?", (roll_no,))
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute("DELETE FROM results WHERE roll_no=%s", (roll_no,))
     conn.commit()
+    cur.close()
     conn.close()
+
     return f"Result for Roll No {roll_no} removed. Student can re‑attempt exam."
 
-import csv, json
-from flask import Response
 
 @app.route('/admin/export_with_responses')
 def export_with_responses():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
 
-    conn = get_db_connection()
-    results = conn.execute("""
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    # ✅ Use DISTINCT ON to get latest result per student
+    cur.execute("""
         SELECT s.roll_no, s.name,
-               COALESCE(r.score, '-') AS score,
-               COALESCE(r.submitted_at, '-') AS submitted_at,
-               COALESCE(r.start_time, '-') AS start_time,
+               COALESCE(r.score::text, '-') AS score,
+               COALESCE(r.submitted_at::text, '-') AS submitted_at,
+               COALESCE(r.start_time::text, '-') AS start_time,
                r.responses
         FROM students s
         LEFT JOIN (
-            SELECT student_roll, score, MAX(submitted_at) AS submitted_at,
-                   MIN(start_time) AS start_time, MAX(responses) AS responses
+            SELECT DISTINCT ON (roll_no) roll_no, score, submitted_at, start_time, responses
             FROM results
-            GROUP BY student_roll
-        ) r ON s.roll_no = r.student_roll
+            ORDER BY roll_no, submitted_at DESC
+        ) r ON s.roll_no = r.roll_no
         ORDER BY s.roll_no
-    """).fetchall()
+    """)
+    results = cur.fetchall()
+
+    cur.close()
     conn.close()
 
     output = Response(content_type="text/csv")
@@ -388,7 +405,12 @@ def export_with_responses():
     writer.writerow(["Roll No", "Name", "Score", "Submitted At", "Start Time", "Question", "Chosen", "Correct", "Is Correct"])
 
     for r in results:
-        responses = json.loads(r['responses']) if r['responses'] else []
+        responses = []
+        if r['responses']:
+            try:
+                responses = json.loads(r['responses'])
+            except Exception:
+                responses = []
         for ans in responses:
             writer.writerow([
                 r['roll_no'],
@@ -396,43 +418,59 @@ def export_with_responses():
                 r['score'],
                 r['submitted_at'],
                 r['start_time'],
-                ans['text'],
-                ans['chosen'],
-                ans['correct'],
-                "Correct" if ans['is_correct'] else "Wrong"
+                ans.get('text', ''),
+                ans.get('chosen', ''),
+                ans.get('correct', ''),
+                "Correct" if ans.get('is_correct') else "Wrong"
             ])
 
     output.headers["Content-Disposition"] = "attachment; filename=results_with_responses.csv"
     return output
+
 
 @app.route('/admin/export_student/<roll_no>')
 def export_student(roll_no):
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
 
-    conn = get_db_connection()
-    r = conn.execute("""
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    # ✅ Use DISTINCT ON to get the latest result for this student
+    cur.execute("""
         SELECT s.roll_no, s.name,
-               COALESCE(r.score, '-') AS score,
-               COALESCE(r.submitted_at, '-') AS submitted_at,
-               COALESCE(r.start_time, '-') AS start_time,
+               COALESCE(r.score::text, '-') AS score,
+               COALESCE(r.submitted_at::text, '-') AS submitted_at,
+               COALESCE(r.start_time::text, '-') AS start_time,
                r.responses
         FROM students s
         LEFT JOIN (
-            SELECT student_roll, score, MAX(submitted_at) AS submitted_at,
-                   MIN(start_time) AS start_time, MAX(responses) AS responses
+            SELECT DISTINCT ON (roll_no) roll_no, score, submitted_at, start_time, responses
             FROM results
-            GROUP BY student_roll
-        ) r ON s.roll_no = r.student_roll
-        WHERE s.roll_no = ?
-    """, (roll_no,)).fetchone()
+            WHERE roll_no = %s
+            ORDER BY roll_no, submitted_at DESC
+        ) r ON s.roll_no = r.roll_no
+        WHERE s.roll_no = %s
+    """, (roll_no, roll_no))
+    r = cur.fetchone()
+
+    cur.close()
     conn.close()
 
     output = Response(content_type="text/csv")
     writer = csv.writer(output.stream)
     writer.writerow(["Roll No", "Name", "Score", "Submitted At", "Start Time", "Question", "Chosen", "Correct", "Is Correct"])
 
-    responses = json.loads(r['responses']) if r['responses'] else []
+    responses = []
+    if r and r['responses']:
+        try:
+            responses = json.loads(r['responses'])
+        except Exception:
+            responses = []
+
     for ans in responses:
         writer.writerow([
             r['roll_no'],
@@ -440,14 +478,15 @@ def export_student(roll_no):
             r['score'],
             r['submitted_at'],
             r['start_time'],
-            ans['text'],
-            ans['chosen'],
-            ans['correct'],
-            "Correct" if ans['is_correct'] else "Wrong"
+            ans.get('text', ''),
+            ans.get('chosen', ''),
+            ans.get('correct', ''),
+            "Correct" if ans.get('is_correct') else "Wrong"
         ])
 
     output.headers["Content-Disposition"] = f"attachment; filename={roll_no}_responses.csv"
     return output
+
 
 
 @app.route('/admin/students')
@@ -474,37 +513,62 @@ def manage_students():
 def add_student():
     roll_no = request.form['roll_no']
     name = request.form['name']
-    conn = get_db_connection()
-    conn.execute("INSERT INTO students (roll_no, name) VALUES (?, ?)", (roll_no, name))
+
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute("INSERT INTO students (roll_no, name) VALUES (%s, %s)", (roll_no, name))
     conn.commit()
+    cur.close()
     conn.close()
+
     return redirect(url_for('manage_students'))
+
 
 @app.route('/admin/update_student/<roll_no>', methods=['POST'])
 def update_student(roll_no):
     new_name = request.form['new_name']
-    conn = get_db_connection()
-    conn.execute("UPDATE students SET name=? WHERE roll_no=?", (new_name, roll_no))
+
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute("UPDATE students SET name=%s WHERE roll_no=%s", (new_name, roll_no))
     conn.commit()
+    cur.close()
     conn.close()
+
     return redirect(url_for('manage_students'))
+
 
 @app.route('/admin/remove_student/<roll_no>', methods=['POST'])
 def remove_student(roll_no):
-    conn = get_db_connection()
-    conn.execute("DELETE FROM students WHERE roll_no=?", (roll_no,))
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute("DELETE FROM students WHERE roll_no=%s", (roll_no,))
     conn.commit()
+    cur.close()
     conn.close()
+
     return redirect(url_for('manage_students'))
+
 
 @app.route('/admin/questions')
 def manage_questions():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_login'))
-    conn = get_db_connection()
-    questions = conn.execute("SELECT * FROM questions ORDER BY id").fetchall()
+
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM questions ORDER BY id")
+    questions = cur.fetchall()
+
+    cur.close()
     conn.close()
+
     return render_template('questions.html', questions=questions)
+
 
 @app.route('/admin/add_question', methods=['POST'])
 def add_question():
@@ -524,32 +588,44 @@ def add_question():
     }
     correct_option = mapping.get(correct_option, correct_option)
 
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO questions (text, option_a, option_b, option_c, option_d, correct_option) VALUES (?, ?, ?, ?, ?, ?)",
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO questions (text, option_a, option_b, option_c, option_d, correct_option) VALUES (%s, %s, %s, %s, %s, %s)",
         (text, option_a, option_b, option_c, option_d, correct_option)
     )
     conn.commit()
+    cur.close()
     conn.close()
+
     return redirect(url_for('manage_questions'))
 
 
 @app.route('/admin/update_question/<int:id>', methods=['POST'])
 def update_question(id):
     new_text = request.form['new_text']
-    conn = get_db_connection()
-    conn.execute("UPDATE questions SET text=? WHERE id=?", (new_text, id))
+
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute("UPDATE questions SET text=%s WHERE id=%s", (new_text, id))
     conn.commit()
+    cur.close()
     conn.close()
+
     return redirect(url_for('manage_questions'))
+
 
 @app.route('/admin/remove_question/<int:id>', methods=['POST'])
 def remove_question(id):
-    conn = get_db_connection()
-    conn.execute("DELETE FROM questions WHERE id=?", (id,))
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    cur = conn.cursor()
+    cur.execute("DELETE FROM questions WHERE id=%s", (id,))
     conn.commit()
+    cur.close()
     conn.close()
+
     return redirect(url_for('manage_questions'))
+
 
 
 # ---------------- MAIN ----------------    
