@@ -26,7 +26,7 @@ def get_db_connection():
 def index():
     return redirect(url_for('login_page'))
 
-    
+
 # Show login page
 @app.route('/login', methods=['GET'])
 def login_page():
@@ -71,12 +71,12 @@ def logout():
 def exam():
     if request.method == 'POST':
         roll_no = request.form['roll_no']
-        session['student_roll'] = roll_no
+        session['roll_no'] = roll_no   # ✅ use consistent session key
     else:
-        roll_no = session.get('student_roll')
+        roll_no = session.get('roll_no')
 
     if not roll_no:
-        return redirect(url_for('login'))
+        return redirect(url_for('login_page'))  # ✅ fixed endpoint name
 
     conn = psycopg2.connect(
         os.environ["DATABASE_URL"],
