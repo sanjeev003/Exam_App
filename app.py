@@ -149,20 +149,28 @@ def exam():
 #     session.pop('student_roll', None)
 #     return render_template('result.html', score=score)
 
-# Submission route with time enforcement
+# Submission route with time enforcement (Postgres version)
 @app.route('/submit', methods=['POST'])
 def submit():
-    roll_no = session.get('student_roll')
+    roll_no = session.get('roll_no')   # ✅ use roll_no, not student_roll
     if not roll_no:
         return "Session expired or invalid access."
 
-    conn = get_db_connection()
-    session_data = conn.execute(
-        "SELECT start_time, question_ids FROM results WHERE student_roll=?",
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=psycopg2.extras.DictCursor
+    )
+    cur = conn.cursor()
+
+    # ✅ use cursor, not conn.execute
+    cur.execute(
+        "SELECT start_time, question_ids FROM results WHERE roll_no=%s",
         (roll_no,)
-    ).fetchone()
+    )
+    session_data = cur.fetchone()
 
     if not session_data or not session_data['start_time']:
+        cur.close()
         conn.close()
         return "Exam session invalid."
 
@@ -172,13 +180,16 @@ def submit():
     elapsed_minutes = (now - start_time).total_seconds() / 60
 
     if elapsed_minutes > 30:
+        cur.close()
         conn.close()
-        session.pop('student_roll', None)
+        session.pop('roll_no', None)
         return "Time is up! Your exam session expired."
 
     # Grade only the assigned questions
     question_ids = session_data['question_ids']
-    questions = conn.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})").fetchall()
+    cur.execute(f"SELECT * FROM questions WHERE id IN ({question_ids})")
+    questions = cur.fetchall()
+
     score = 0
     feedback = []
 
@@ -186,7 +197,6 @@ def submit():
         user_answer = request.form.get(str(q['id']))
         print(f"Question ID: {q['id']}, User answer: {user_answer}, Correct answer key: {q['correct_option']}")
 
-        # Explicitly map option keys to their actual text values
         options_map = {
             "option_a": q["option_a"],
             "option_b": q["option_b"],
@@ -208,19 +218,18 @@ def submit():
         if user_answer == correct_key:
             score += 1
 
-    # 🔹 NEW: Save responses JSON into results table
-    import json
-    conn.execute(
-        "UPDATE results SET score=?, submitted_at=?, responses=? WHERE student_roll=?",
+    # 🔹 Save responses JSON into results table
+    cur.execute(
+        "UPDATE results SET score=%s, submitted_at=%s, responses=%s WHERE roll_no=%s",
         (score, now.strftime("%Y-%m-%d %H:%M:%S"), json.dumps(feedback), roll_no)
     )
-    
+
     conn.commit()
+    cur.close()
     conn.close()
 
-    session.pop('student_roll', None)
+    session.pop('roll_no', None)
     return render_template('result.html', score=score, feedback=feedback)
-
 
 
 # ---------------- ADMIN ROUTES ----------------
