@@ -144,7 +144,8 @@
 
     <div class="login-container">
         <h2>Student Login</h2>
-        <form method="POST" action="/exam">
+        <!-- ✅ Updated: post to /login -->
+        <form method="POST" action="/login">
             <label for="roll_no">Enter Roll Number:</label>
             <input type="text" id="roll_no" name="roll_no" required>
             <button type="submit">Login</button>
@@ -153,36 +154,35 @@
     </div>
 
     <div class="footer">
-    <div class="footer-content">
-        <!-- Left side: Story -->
-        <div class="footer-left">
-            <h3>Why This Platform Exists</h3>
-            <p>
-                It all started here at <strong>NIT Uttarakhand</strong>, during our lab exams.  
-                We saw piles of answer sheets, stacks of paper wasted, and teachers spending long hours correcting them.  
-                The process felt heavy — on the environment, on time, and on effort.
-            </p>
-            <p>
-                That’s when the idea struck: <em>why not bring our exams online?</em>  
-                A platform that saves paper, reduces correction time, and makes the whole process smoother for both students and teachers.  
-                This is not just code — it’s a step toward sustainability and efficiency.
-            </p>
-            <p class="feedback">
-                Dear students, this is the very first draft of my idea.  
-                Your experience matters — please share your thoughts, stories, and suggestions.  
-                Together, we can make this platform better, smarter, and truly ours.
-            </p>
-        </div>
+        <div class="footer-content">
+            <!-- Left side: Story -->
+            <div class="footer-left">
+                <h3>Why This Platform Exists</h3>
+                <p>
+                    It all started here at <strong>NIT Uttarakhand</strong>, during our lab exams.  
+                    We saw piles of answer sheets, stacks of paper wasted, and teachers spending long hours correcting them.  
+                    The process felt heavy — on the environment, on time, and on effort.
+                </p>
+                <p>
+                    That’s when the idea struck: <em>why not bring our exams online?</em>  
+                    A platform that saves paper, reduces correction time, and makes the whole process smoother for both students and teachers.  
+                    This is not just code — it’s a step toward sustainability and efficiency.
+                </p>
+                <p class="feedback">
+                    Dear students, this is the very first draft of my idea.  
+                    Your experience matters — please share your thoughts, stories, and suggestions.  
+                    Together, we can make this platform better, smarter, and truly ours.
+                </p>
+            </div>
 
-        <!-- Right side: Photo + Name -->
-        <div class="footer-right">
-            <img src="{{ url_for('static', filename='images/my.jpg') }}" alt="Developer Photo" class="dev-photo">
-
-            <p class="dev-name"><strong>- SANJEEV KUMAR</strong></p>
+            <!-- Right side: Photo + Name -->
+            <div class="footer-right">
+                <img src="{{ url_for('static', filename='images/my.jpg') }}" alt="Developer Photo" class="dev-photo">
+                <p class="dev-name"><strong>- SANJEEV KUMAR</strong></p>
+            </div>
         </div>
     </div>
-</div>
-
 
 </body>
+
 </html>
