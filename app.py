@@ -208,7 +208,14 @@ def submit():
         return "Exam session invalid."
 
     ist = pytz.timezone('Asia/Kolkata')
-    start_time = ist.localize(datetime.strptime(session_data['start_time'], "%Y-%m-%d %H:%M:%S"))
+    start_time_value = session_data['start_time']
+
+    # 🔹 Fix: handle both string and datetime cases
+    if isinstance(start_time_value, datetime):
+        start_time = ist.localize(start_time_value)
+    else:
+        start_time = ist.localize(datetime.strptime(start_time_value, "%Y-%m-%d %H:%M:%S"))
+
     now = datetime.now(ist)
     elapsed_minutes = (now - start_time).total_seconds() / 60
 
