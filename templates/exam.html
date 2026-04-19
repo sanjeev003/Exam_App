@@ -77,10 +77,10 @@
             {% for q in questions %}
             <div class="question">
                 <p>Q{{ loop.index }}. {{ q['text'] }}</p>
-                <label><input type="radio" name="{{ q['id'] }}" value="option_a"> {{ q['option_a'] }}</label>
-                <label><input type="radio" name="{{ q['id'] }}" value="option_b"> {{ q['option_b'] }}</label>
-                <label><input type="radio" name="{{ q['id'] }}" value="option_c"> {{ q['option_c'] }}</label>
-                <label><input type="radio" name="{{ q['id'] }}" value="option_d"> {{ q['option_d'] }}</label>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_a" required> {{ q['option_a'] }}</label>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_b" required> {{ q['option_b'] }}</label>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_c" required> {{ q['option_c'] }}</label>
+                <label><input type="radio" name="{{ q['id'] }}" value="option_d" required> {{ q['option_d'] }}</label>
             </div>
             {% endfor %}
             <button type="submit">Submit Exam</button>
@@ -108,43 +108,20 @@
     }
     setInterval(updateTimer, 1000);
 
-    // 🔹 Browser Lock Features
-
-    // Warn if the student tries to close or refresh
-    window.onbeforeunload = function() {
-        return "You cannot leave the exam before submitting!";
-    };
-
-    // Disable warning when submitting
-    document.getElementById("examForm").addEventListener("submit", function() {
-        window.onbeforeunload = null;
-    });
-
-    // Detect tab switch or minimize
-    document.addEventListener("visibilitychange", function() {
-        if (document.hidden) {
-            alert("⚠ Tab switch detected! Please stay on the exam page.");
-        }
-    });
-
-    // Disable right-click
-    document.addEventListener("contextmenu", event => event.preventDefault());
-
-    // Force fullscreen only after a user gesture
+    // Fullscreen + browser lock features
     function lockFullscreen() {
         let elem = document.documentElement;
         if (elem.requestFullscreen) {
             elem.requestFullscreen();
-        } else if (elem.mozRequestFullScreen) { // Firefox
+        } else if (elem.mozRequestFullScreen) {
             elem.mozRequestFullScreen();
-        } else if (elem.webkitRequestFullscreen) { // Chrome, Safari
+        } else if (elem.webkitRequestFullscreen) {
             elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) { // IE/Edge
+        } else if (elem.msRequestFullscreen) {
             elem.msRequestFullscreen();
         }
     }
 
-    // Add a button to trigger fullscreen
     document.addEventListener("DOMContentLoaded", function() {
         const btn = document.createElement("button");
         btn.textContent = "Start Exam (Enter Fullscreen)";
@@ -152,18 +129,34 @@
         btn.onclick = function() {
             lockFullscreen();
             btn.style.display = "none"; // hide button after entering fullscreen
+
+            // Activate browser lock features only after exam starts
+            window.onbeforeunload = function() {
+                return "You cannot leave the exam before submitting!";
+            };
+
+            document.getElementById("examForm").addEventListener("submit", function() {
+                window.onbeforeunload = null;
+            });
+
+            document.addEventListener("visibilitychange", function() {
+                if (document.hidden) {
+                    alert("⚠ Tab switch detected! Please stay on the exam page.");
+                }
+            });
+
+            document.addEventListener("fullscreenchange", function() {
+                if (!document.fullscreenElement) {
+                    alert("⚠ Fullscreen is required for the exam. Please re‑enter.");
+                }
+            });
+
+            // Disable right-click
+            document.addEventListener("contextmenu", event => event.preventDefault());
         };
         document.body.insertBefore(btn, document.body.firstChild);
     });
-
-    // Try to re‑enter fullscreen if user exits
-    document.addEventListener("fullscreenchange", function() {
-        if (!document.fullscreenElement) {
-            alert("⚠ Fullscreen is required for the exam. Please re‑enter.");
-        }
-    });
-</script>
+    </script>
 
 </body>
-
 </html>
