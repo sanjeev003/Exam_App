@@ -219,7 +219,7 @@ def submit():
     ist = pytz.timezone('Asia/Kolkata')
     start_time_value = session_data['start_time']
 
-    # ✅ Fix: handle both datetime and string cases safely
+    # ✅ Handle both datetime and string cases safely
     if isinstance(start_time_value, datetime):
         # If Postgres already returns datetime, just convert timezone
         start_time = start_time_value.astimezone(ist)

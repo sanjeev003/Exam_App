@@ -68,7 +68,7 @@
         <h2>Welcome, {{ student['name'] }} (Roll No: {{ student['roll_no'] }})</h2>
     </header>
 
-    <div id="timer"></div>
+    <div id="timer">Click "Start Exam" to begin</div>
 
     <div class="exam-container">
         <p>You have 30 minutes to complete 30 questions.</p>
@@ -88,28 +88,59 @@
     </div>
 
     <script>
-    // ✅ Timer logic using ISO start_time
-    const startTime = Date.parse("{{ start_time }}");  // backend sends ISO format
-    const duration = (30 + 1) * 60 * 1000; // 31 minutes (grace period)
-    const endTime = startTime + duration;
+    let examStarted = false;
 
-    function updateTimer() {
-        const now = Date.now();
-        const remaining = endTime - now;
+    function startExam() {
+        examStarted = true;
+        lockFullscreen();
 
-        if (remaining <= 0) {
-            document.getElementById("timer").innerHTML = "Time is up!";
-            document.getElementById("examForm").submit();
-        } else {
-            const minutes = Math.floor(remaining / 1000 / 60);
-            const seconds = Math.floor((remaining / 1000) % 60);
-            document.getElementById("timer").innerHTML =
-                minutes + "m " + seconds + "s remaining";
+        const startTime = Date.parse("{{ start_time }}");  // backend sends ISO format
+        const duration = (30 + 1) * 60 * 1000; // 31 minutes (grace period)
+        const endTime = startTime + duration;
+
+        function updateTimer() {
+            if (!examStarted) return;
+            const now = Date.now();
+            const remaining = endTime - now;
+
+            if (remaining <= 0) {
+                document.getElementById("timer").innerHTML = "Time is up!";
+                document.getElementById("examForm").submit();
+            } else {
+                const minutes = Math.floor(remaining / 1000 / 60);
+                const seconds = Math.floor((remaining / 1000) % 60);
+                document.getElementById("timer").innerHTML =
+                    minutes + "m " + seconds + "s remaining";
+            }
         }
-    }
-    setInterval(updateTimer, 1000);
+        setInterval(updateTimer, 1000);
 
-    // ✅ Fullscreen + browser lock features
+        // Activate browser lock features only after exam starts
+        window.onbeforeunload = function() {
+            return "You cannot leave the exam before submitting!";
+        };
+
+        document.getElementById("examForm").addEventListener("submit", function() {
+            window.onbeforeunload = null;
+        });
+
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) {
+                alert("⚠ Tab switch detected! Please stay on the exam page.");
+            }
+        });
+
+        document.addEventListener("fullscreenchange", function() {
+            if (!document.fullscreenElement) {
+                alert("⚠ Fullscreen is required for the exam. Please re‑enter.");
+            }
+        });
+
+        // Disable right-click
+        document.addEventListener("contextmenu", event => event.preventDefault());
+    }
+
+    // Fullscreen helper
     function lockFullscreen() {
         let elem = document.documentElement;
         if (elem.requestFullscreen) {
@@ -128,32 +159,8 @@
         btn.textContent = "Start Exam (Enter Fullscreen)";
         btn.style = "padding:10px 20px; background:#3498db; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:16px;";
         btn.onclick = function() {
-            lockFullscreen();
-            btn.style.display = "none"; // hide button after entering fullscreen
-
-            // Activate browser lock features only after exam starts
-            window.onbeforeunload = function() {
-                return "You cannot leave the exam before submitting!";
-            };
-
-            document.getElementById("examForm").addEventListener("submit", function() {
-                window.onbeforeunload = null;
-            });
-
-            document.addEventListener("visibilitychange", function() {
-                if (document.hidden) {
-                    alert("⚠ Tab switch detected! Please stay on the exam page.");
-                }
-            });
-
-            document.addEventListener("fullscreenchange", function() {
-                if (!document.fullscreenElement) {
-                    alert("⚠ Fullscreen is required for the exam. Please re‑enter.");
-                }
-            });
-
-            // Disable right-click
-            document.addEventListener("contextmenu", event => event.preventDefault());
+            btn.style.display = "none"; // hide button after starting
+            startExam();
         };
         document.body.insertBefore(btn, document.body.firstChild);
     });
