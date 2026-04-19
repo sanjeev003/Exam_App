@@ -21,6 +21,12 @@ def get_db_connection():
 
 # ---------------- STUDENT ROUTES ----------------
 
+# Root URL → redirect to login
+@app.route('/')
+def index():
+    return redirect(url_for('login_page'))
+
+    
 # Show login page
 @app.route('/login', methods=['GET'])
 def login_page():
