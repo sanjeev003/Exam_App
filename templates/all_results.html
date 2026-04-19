@@ -148,10 +148,10 @@
             <ul>
             {% for ans in r.responses_parsed %}
                 <li>
-                    <strong>Q:</strong> {{ ans.text }}<br>
-                    <strong>Your Answer:</strong> {{ ans.chosen }}<br>
-                    <strong>Correct Answer:</strong> {{ ans.correct }}<br>
-                    <strong>Status:</strong> {{ '✔ Correct' if ans.is_correct else '✘ Wrong' }}
+                    <strong>Q:</strong> {{ ans['text'] }}<br>
+                    <strong>Your Answer:</strong> {{ ans['chosen'] }}<br>
+                    <strong>Correct Answer:</strong> {{ ans['correct'] }}<br>
+                    <strong>Status:</strong> {{ '✔ Correct' if ans['is_correct'] else '✘ Wrong' }}
                 </li>
             {% endfor %}
             </ul>
@@ -160,6 +160,7 @@
         No responses
     {% endif %}
 </td>
+
 
                 <td>
                     {% if r['score'] != '-' %}
