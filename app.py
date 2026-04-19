@@ -21,10 +21,34 @@ def get_db_connection():
 
 # ---------------- STUDENT ROUTES ----------------
 
-@app.route('/')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'POST':
+        roll_no = request.form['roll_no']
+
+        conn = psycopg2.connect(
+            os.environ["DATABASE_URL"],
+            cursor_factory=psycopg2.extras.DictCursor
+        )
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM students WHERE roll_no=%s", (roll_no,))
+        student = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if student is None:
+            return "Invalid Roll No. Please contact admin."
+
+        # ✅ set roll_no in session
+        session['student_logged_in'] = True
+        session['roll_no'] = student['roll_no']
+        session['student_name'] = student['name']
+
+        return redirect(url_for('exam'))
+
+    # GET request → show login page
     return render_template('login.html')
-from flask import session, redirect, url_for
+
 
 @app.route('/logout')
 def logout():
