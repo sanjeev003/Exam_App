@@ -92,6 +92,15 @@
             text-align: left;
             margin-top: 10px;
         }
+        .responses-content ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .responses-content li {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+        }
     </style>
     <script>
         function toggleResponses(id) {
@@ -105,8 +114,6 @@
                 icon.textContent = "➕"; // expand icon
             }
         }
-
-
     </script>
 </head>
 <body>
@@ -138,14 +145,16 @@
                             <span id="icon-{{ r['roll_no'] }}">➕</span>
                         </button>
                         <div id="responses-{{ r['roll_no'] }}" class="responses-content">
+                            <ul>
                             {% for ans in r['responses_parsed'] %}
-                                <p>
+                                <li>
                                     <strong>Q:</strong> {{ ans['text'] }}<br>
-                                    <strong>Chosen:</strong> {{ ans['chosen'] }}<br>
-                                    <strong>Correct:</strong> {{ ans['correct'] }}<br>
+                                    <strong>Your Answer:</strong> {{ ans['chosen'] }}<br>
+                                    <strong>Correct Answer:</strong> {{ ans['correct'] }}<br>
                                     <strong>Status:</strong> {{ '✔ Correct' if ans['is_correct'] else '✘ Wrong' }}
-                                </p>
+                                </li>
                             {% endfor %}
+                            </ul>
                         </div>
                     {% else %}
                         No responses
