@@ -106,7 +106,9 @@ def exam():
     existing_result = cur.fetchone()
 
     if not existing_result or existing_result['start_time'] is None:
-        start_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+        # ✅ store as datetime object, not string
+        start_time = datetime.now(ist)
+
         # Pick 30 random questions
         cur.execute("SELECT id FROM questions ORDER BY RANDOM() LIMIT 30")
         questions = cur.fetchall()
@@ -130,7 +132,14 @@ def exam():
 
     cur.close()
     conn.close()
-    return render_template('exam.html', student=student, questions=questions, start_time=start_time)
+
+    # ✅ pass ISO string to template for JS timer
+    return render_template(
+        'exam.html',
+        student=student,
+        questions=questions,
+        start_time=start_time.isoformat()
+    )
 
 
 # @app.route("/initdb")
@@ -185,7 +194,7 @@ def exam():
 # Submission route with time enforcement (Postgres version)
 @app.route('/submit', methods=['POST'])
 def submit():
-    roll_no = session.get('roll_no')   # ✅ use roll_no, not student_roll
+    roll_no = session.get('roll_no')   # ✅ use roll_no consistently
     if not roll_no:
         return "Session expired or invalid access."
 
@@ -195,7 +204,7 @@ def submit():
     )
     cur = conn.cursor()
 
-    # ✅ use cursor, not conn.execute
+    # Fetch exam session data
     cur.execute(
         "SELECT start_time, question_ids FROM results WHERE roll_no=%s",
         (roll_no,)
@@ -210,16 +219,19 @@ def submit():
     ist = pytz.timezone('Asia/Kolkata')
     start_time_value = session_data['start_time']
 
-    # 🔹 Fix: handle both string and datetime cases
+    # ✅ Fix: handle both datetime and string cases safely
     if isinstance(start_time_value, datetime):
-        start_time = ist.localize(start_time_value)
+        # If Postgres already returns datetime, just convert timezone
+        start_time = start_time_value.astimezone(ist)
     else:
+        # If stored as string, parse it
         start_time = ist.localize(datetime.strptime(start_time_value, "%Y-%m-%d %H:%M:%S"))
 
     now = datetime.now(ist)
     elapsed_minutes = (now - start_time).total_seconds() / 60
 
-    if elapsed_minutes > 30:
+    # ✅ Optional: add 1-minute grace period
+    if elapsed_minutes > 31:
         cur.close()
         conn.close()
         session.pop('roll_no', None)
@@ -258,7 +270,7 @@ def submit():
         if user_answer == correct_key:
             score += 1
 
-    # 🔹 Save responses JSON into results table
+    # Save responses JSON into results table
     cur.execute(
         "UPDATE results SET score=%s, submitted_at=%s, responses=%s WHERE roll_no=%s",
         (score, now.strftime("%Y-%m-%d %H:%M:%S"), json.dumps(feedback), roll_no)

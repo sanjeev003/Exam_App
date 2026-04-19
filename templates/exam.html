@@ -88,27 +88,28 @@
     </div>
 
     <script>
-    // Timer logic
-    const startTime = new Date("{{ start_time }}").getTime();
-    const duration = 30 * 60 * 1000; // 30 minutes
+    // ✅ Timer logic using ISO start_time
+    const startTime = Date.parse("{{ start_time }}");  // backend sends ISO format
+    const duration = (30 + 1) * 60 * 1000; // 31 minutes (grace period)
     const endTime = startTime + duration;
 
     function updateTimer() {
-        const now = new Date().getTime();
+        const now = Date.now();
         const remaining = endTime - now;
 
         if (remaining <= 0) {
             document.getElementById("timer").innerHTML = "Time is up!";
             document.getElementById("examForm").submit();
         } else {
-            const minutes = Math.floor((remaining / 1000 / 60));
+            const minutes = Math.floor(remaining / 1000 / 60);
             const seconds = Math.floor((remaining / 1000) % 60);
-            document.getElementById("timer").innerHTML = minutes + "m " + seconds + "s remaining";
+            document.getElementById("timer").innerHTML =
+                minutes + "m " + seconds + "s remaining";
         }
     }
     setInterval(updateTimer, 1000);
 
-    // Fullscreen + browser lock features
+    // ✅ Fullscreen + browser lock features
     function lockFullscreen() {
         let elem = document.documentElement;
         if (elem.requestFullscreen) {
