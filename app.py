@@ -326,7 +326,6 @@ def view_results():
     )
     cur = conn.cursor()
 
-    # ✅ Use DISTINCT ON to get the latest result per student
     cur.execute("""
         SELECT s.roll_no, s.name,
                COALESCE(r.score::text, '-') AS score,
@@ -347,16 +346,24 @@ def view_results():
     cur.close()
     conn.close()
 
-    # Decode JSON responses into Python objects
     processed_results = []
+
     for r in results:
         responses = []
+
         if r['responses']:
-            try:
-                responses = json.loads(r['responses'])
-            except Exception:
-                responses = []
-        processed_results.append({**r, "responses_parsed": responses})
+            if isinstance(r['responses'], str):
+                try:
+                    responses = json.loads(r['responses'])
+                except Exception:
+                    responses = []
+            elif isinstance(r['responses'], list):
+                responses = r['responses']
+
+        processed_results.append({
+            **r,
+            "responses_parsed": responses
+        })
 
     return render_template('all_results.html', results=processed_results)
 
@@ -429,7 +436,7 @@ def remove_result(roll_no):
 
     return f"Result for Roll No {roll_no} removed. Student can re‑attempt exam."
 
-
+from io import StringIO
 @app.route('/admin/export_with_responses')
 def export_with_responses():
     if not session.get('admin_logged_in'):
@@ -441,7 +448,6 @@ def export_with_responses():
     )
     cur = conn.cursor()
 
-    # ✅ Use DISTINCT ON to get latest result per student
     cur.execute("""
         SELECT s.roll_no, s.name,
                COALESCE(r.score::text, '-') AS score,
@@ -457,22 +463,42 @@ def export_with_responses():
         ORDER BY s.roll_no
     """)
     results = cur.fetchall()
-    print(results)
 
     cur.close()
     conn.close()
 
-    output = Response(content_type="text/csv")
-    writer = csv.writer(output.stream)
-    writer.writerow(["Roll No", "Name", "Score", "Submitted At", "Start Time", "Question", "Chosen", "Correct", "Is Correct"])
+    # ✅ FIX: Use StringIO instead of Response.stream
+    si = StringIO()
+    writer = csv.writer(si)
+
+    writer.writerow([
+        "Roll No", "Name", "Score", "Submitted At",
+        "Start Time", "Question", "Chosen", "Correct", "Is Correct"
+    ])
 
     for r in results:
         responses = []
+
         if r['responses']:
-            try:
-                responses = json.loads(r['responses'])
-            except Exception:
-                responses = []
+            if isinstance(r['responses'], str):
+                try:
+                    responses = json.loads(r['responses'])
+                except Exception:
+                    responses = []
+            elif isinstance(r['responses'], list):
+                responses = r['responses']
+
+        # ✅ If no responses, still write basic row (optional)
+        if not responses:
+            writer.writerow([
+                r['roll_no'],
+                r['name'],
+                r['score'],
+                r['submitted_at'],
+                r['start_time'],
+                "", "", "", ""
+            ])
+
         for ans in responses:
             writer.writerow([
                 r['roll_no'],
@@ -486,7 +512,10 @@ def export_with_responses():
                 "Correct" if ans.get('is_correct') else "Wrong"
             ])
 
+    # ✅ Return CSV properly
+    output = Response(si.getvalue(), mimetype="text/csv")
     output.headers["Content-Disposition"] = "attachment; filename=results_with_responses.csv"
+
     return output
 
 

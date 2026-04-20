@@ -140,7 +140,7 @@
                 <td>{{ r['score'] }}</td>
                 <td>{{ r['submitted_at'] }}</td>
                 <td>
-                    <pre>{{ r.responses_parsed }}</pre> 
+                    <!-- <pre>{{ r.responses_parsed }}</pre>  -->
     {% if r.responses_parsed and r.responses_parsed|length > 0 %}
         <button class="collapsible" onclick="toggleResponses('{{ r.roll_no }}')">
             <span id="icon-{{ r.roll_no }}">➕</span>
