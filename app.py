@@ -457,6 +457,7 @@ def export_with_responses():
         ORDER BY s.roll_no
     """)
     results = cur.fetchall()
+    print(results)
 
     cur.close()
     conn.close()
